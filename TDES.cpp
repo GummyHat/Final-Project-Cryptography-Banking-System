@@ -1,4 +1,6 @@
 #include "TDES.h"
+#include <vector>
+#include <string.h>
 
 
 const int Permutation_Map_1[56] = {
@@ -528,16 +530,47 @@ std::bitset<48> PC2_Function(const std::bitset<56>& key) {
     return output;
 }
 
-std::bitset<64> Hex_To_Binary(const std::string& hex) {
-    unsigned long long decimal_value = std::stoull(hex, nullptr, 16);
-    std::bitset<64> output(decimal_value);
-    return output;
+std::string Hex_To_Binary(const std::string& hex) {
+    //only using for hmac so always gonna be divisible by 2
+    std::string res;
+    for (int i = 0; i < hex.size(); i += 2) {
+        unsigned char cur = 0;
+        if (hex[i] >= '0' && hex[i] <= '9') {
+            cur = hex[i] - '0';
+        }
+        else if (hex[i] >= 'a' && hex[i] <= 'f') {
+            cur = hex[i] - 'a' + 10;
+        }
+        cur = cur << 4;
+        if (hex[i + 1] >= '0' && hex[i + 1] <= '9') {
+            cur += hex[i + 1] - '0';
+        }
+        else if (hex[i + 1] >= 'a' && hex[i + 1] <= 'f') {
+            cur += hex[i + 1] - 'a' + 10;
+        }
+        res.push_back(cur);
+    }
+    return res;
 }
 
-std::string Binary_To_Hex(const std::bitset<64>& binary) {
-    unsigned long long decimal_value = binary.to_ullong();
-    std::stringstream ss;
-    ss << std::hex << std::setfill('0') << std::setw(16) << decimal_value;
-    std::string output = ss.str();
+std::string Binary_To_Hex(const std::string& binary) {
+    std::string output;
+    char mask = (1 << 4) - 1;
+    for (int i = 0; i < binary.size(); ++i) {
+        unsigned char cur = (binary[i] >> 4) & mask;
+        if (cur < 10) {
+            output.push_back(cur + '0');
+        }
+        else if (cur >= 10) {
+            output.push_back(cur - 10 + 'a');
+        }
+        cur = binary[i] & mask;
+        if (cur < 10) {
+            output.push_back(cur + '0');
+        }
+        else if (cur >= 10) {
+            output.push_back(cur - 10 + 'a');
+        }
+    }
     return output;
 }

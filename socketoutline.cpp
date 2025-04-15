@@ -208,7 +208,7 @@ int main(){
                     }
                     break;
                 }
-                case('2'): // taking in client requests, parsing them ensuring compliance
+                case('2'): { // taking in client requests, parsing them ensuring compliance
                     //Take in the ECC symmetric key
                     //Take in the message
                     //Return the ciphertext
@@ -290,7 +290,7 @@ int main(){
     
                     
                     send(clientSocket, cipherTextOut, sizeof(message), 0);
-                    
+                }
                     break;         
 
                 case('3'): // exit for the client, clean up things that need clean up or returning data thats pending
