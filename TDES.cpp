@@ -1,7 +1,5 @@
 #include "TDES.h"
-#include <vector>
 #include <string.h>
-
 
 const int Permutation_Map_1[56] = {
     7,  15, 23, 31, 39, 47, 55,
@@ -310,7 +308,7 @@ int TDES_Decrypt_Bytes(unsigned char* plaintext_output, const unsigned char* cip
         P_K3R[i] = P_K3[i + 28];
     }
 
-    for (int round = 15; round >= 0; round--)
+    for (int round = 0; round < 16; round++)
     {
         int shift = Shift_Schedule[round];
         P_K1L = leftCircularBitShift(P_K1L, shift);
@@ -329,28 +327,27 @@ int TDES_Decrypt_Bytes(unsigned char* plaintext_output, const unsigned char* cip
         K3_SubKeys[round] = PC2_Function(mergedKeys);
     }
 
-    int padding = 8 - (ciphertext_length % 8);
-    int padding_length = ciphertext_length + padding;
-    std::vector<unsigned char> padded_ciphertext(padding_length);
-    memcpy(padded_ciphertext.data(), ciphertext, ciphertext_length);
-    for (int i = 0; i < padding; i++)
+    for (int i = 0; i < ciphertext_length; i += 8)
     {
-        padded_ciphertext[ciphertext_length + i] = static_cast<unsigned char>(padding);
-    }
-
-    int plaintext_length = 0;
-    for (int i = 0; i < padding_length; i += 8)
-    {
-        std::bitset<64> ciphertextBlock = Bytes_To_Bitset(padded_ciphertext.data() + i);
-        std::bitset<64> plainBlock1 = DES_Encrypt(ciphertextBlock, K1_SubKeys);
-        std::bitset<64> plainBlock2 = DES_Decrypt(plainBlock1, K2_SubKeys);
-        std::bitset<64> plainBlock3 = DES_Encrypt(plainBlock2, K3_SubKeys);
+        std::bitset<64> ciphertextBlock = Bytes_To_Bitset(ciphertext + i); // Read directly from input ciphertext
+        std::bitset<64> plainBlock1 = DES_Decrypt(ciphertextBlock, K3_SubKeys); // Decrypt with K3
+        std::bitset<64> plainBlock2 = DES_Encrypt(plainBlock1, K2_SubKeys); // Encrypt with K2
+        std::bitset<64> plainBlock3 = DES_Decrypt(plainBlock2, K1_SubKeys); // Decrypt with K1
 
         Bitset_To_Bytes(plainBlock3, plaintext_output + i);
-        plaintext_length += 8;
     }
-
-    return plaintext_length;
+    if (ciphertext_length == 0) return 0;
+    unsigned char padding_value = plaintext_output[ciphertext_length - 1];
+    if (padding_value < 1 || padding_value > 8) {
+        return -1;
+    }
+    for (int k = 1; k <= padding_value; k++) {
+        if (plaintext_output[ciphertext_length - k] != padding_value) {
+            return -1;
+        }
+    }
+    int original_plaintext_length = ciphertext_length - padding_value;
+    return original_plaintext_length;
 }
 
 std::bitset<64> DES_Encrypt(const std::bitset<64>& plaintext, const std::bitset<48> subkeys[16])
