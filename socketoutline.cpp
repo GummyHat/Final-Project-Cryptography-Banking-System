@@ -233,7 +233,6 @@ void clientHandle(int clientSocket) {
                         std::string messageHex = to_string(message[0]);
                         std::string hmac = createMAC(messageHex, Key1);
                         memset(message[1], hmac, sizeof(hmac));
-                        int cipherTextOut;
                         TDES_Encrypt_Bytes(cipherTextOut, message, sizeof(message), TDES_Key);
                     }
                 }
