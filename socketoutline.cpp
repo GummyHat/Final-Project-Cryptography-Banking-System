@@ -21,6 +21,10 @@ using namespace std;
 void ExitHandle(int);
 int serverSocket;
 vector<user> database;
+__uint128_t privateKey;
+CPoint pubKey;
+CPoint clientPub;
+CPoint symm;
 
 bool isExit(const unsigned char text[64]){ //is the plaintext all one bits?
     for(int i = 0; i < 64; i++){
@@ -30,46 +34,11 @@ bool isExit(const unsigned char text[64]){ //is the plaintext all one bits?
     }
     return true;
 }
-
-
-int main(){
-    database = readDatabase("database.csv");
-    signal(SIGINT, ExitHandle);
-
-    //~~~~~~~~~~~~~~~~~~~~~~~ SEVER BOILERPLATE ~~~~~~~~~~~~~~~~~~~~~~~~
-    serverSocket = socket(AF_INET, SOCK_STREAM, 0);
-    // specifying the address
-    sockaddr_in serverAddress;
-    serverAddress.sin_family = AF_INET;
-    serverAddress.sin_port = htons(8080);
-    serverAddress.sin_addr.s_addr = INADDR_ANY;
-    bind(serverSocket, (struct sockaddr*)&serverAddress,sizeof(serverAddress));
-    listen(serverSocket, 5);
+void clientHandle(int clientSocket) {
+    char switchcase = 0;
     cstrand gen(getpid() + time(NULL) + (getppid()<<12), getpid() * time(NULL) ^ (getppid()<<12) );
-    __uint128_t privateKey;
-    CPoint pubKey;
-    CPoint clientPub;
-    CPoint symm;
-    generateKeyPair(&pubKey, &privateKey, gen);
+
     user *curUser;
-
-
-    
-
-
-
-
-
-    while(true){ // ~~~~~~~~~ CLIENT ACCEPT LOOP ~~~~~~~~~~~~. SEVERS ARE NOT EXPECTED TO GO DOWN
-        //we assume there is no client to start this loop
-        
-        // I assume overwriting clientsocket waiting for accept() to go through is.... fine? :<
-        // they either did something wrong or called EXIT through commands :>
-        accepting:
-        int clientSocket = accept(serverSocket, nullptr, nullptr);
-        char switchcase = 0;
-        
-
         //for these this should be a loop taking 8 bits over and over and casting it 0-255. 
         //just leave it blank or override it with 0s if its past your message length please :>
         char message[26 * sizeof(CPoint)] = { 0 }; 
@@ -85,7 +54,7 @@ int main(){
             if (!verifyPublicKey(&clientPub)) {
                 cout << "cant verify" << endl;
                 close(clientSocket);
-                break;
+                exit(0);
             }
             setPublicKey(&clientPub);
             symm = multPrivate(&clientPub);
@@ -103,7 +72,7 @@ int main(){
             for (int i = 0; i < 20; ++i) {
                 if (!verifyPublicKey(mes + i)) {
                     close(clientSocket);
-                    goto accepting;
+                    exit(0);
                 }
             }
             eccDecrypt(mes, 13, (CPoint *)message);
@@ -115,7 +84,7 @@ int main(){
             if (time(NULL) - timestamp > 1000000) {
                 cout << "bad timestamp" << endl;
                 close(clientSocket);
-                goto accepting;
+                exit(0);
             }
             string username;
             for (int i = 0; i < size + 5; ++i) {
@@ -134,15 +103,14 @@ int main(){
             if (hmac.compare(clientMac) != 0) {
                 cout << "MACCING" << endl;
                 close(clientSocket);
-                goto accepting;
+                exit(0);
             }
             recv(clientSocket, buffer, sizeof(buffer), 0);
             mes = (CPoint *)buffer;
             for (int i = 0; i < 20; ++i) {
                 if (!verifyPublicKey(mes + i)) {
                     close(clientSocket);
-                    goto accepting;
-                    break;
+                    exit(0);
                 }
             }
             eccDecrypt(mes, 13, (CPoint *)message);
@@ -154,8 +122,7 @@ int main(){
             if (time(NULL) - timestamp > 1000000) {
                 cout << "bad timestamp" << endl;
                 close(clientSocket);
-                goto accepting;
-                break;
+                exit(0);
             }
             string password;
             for (int i = 0; i < size + 5; ++i) {
@@ -174,7 +141,7 @@ int main(){
             if (hmac.compare(clientMac) != 0) {
                 cout << "MACCING" << endl;
                 close(clientSocket);
-                goto accepting;
+                exit(0);
             }
             username.erase(0, 5);
             password.erase(0, 5);
@@ -192,7 +159,7 @@ int main(){
             }
             if (!logged) {
                 close(clientSocket);
-                goto accepting;
+                exit(0);
             }
         }
         //clients will send data in chunks of 128 of 8 bits = 1024 bits
@@ -309,6 +276,45 @@ int main(){
                 close(clientSocket);
                 break;
             }
+        }
+}
+
+
+int main(){
+    database = readDatabase("database.csv");
+    signal(SIGINT, ExitHandle);
+
+    //~~~~~~~~~~~~~~~~~~~~~~~ SEVER BOILERPLATE ~~~~~~~~~~~~~~~~~~~~~~~~
+    serverSocket = socket(AF_INET, SOCK_STREAM, 0);
+    // specifying the address
+    sockaddr_in serverAddress;
+    serverAddress.sin_family = AF_INET;
+    serverAddress.sin_port = htons(8080);
+    serverAddress.sin_addr.s_addr = INADDR_ANY;
+    bind(serverSocket, (struct sockaddr*)&serverAddress,sizeof(serverAddress));
+    listen(serverSocket, 5);
+    cstrand gen(getpid() + time(NULL) + (getppid()<<12), getpid() * time(NULL) ^ (getppid()<<12) );
+    generateKeyPair(&pubKey, &privateKey, gen);
+
+
+    
+
+
+
+
+
+    while(true){ // ~~~~~~~~~ CLIENT ACCEPT LOOP ~~~~~~~~~~~~. SEVERS ARE NOT EXPECTED TO GO DOWN
+        //we assume there is no client to start this loop
+        
+        // I assume overwriting clientsocket waiting for accept() to go through is.... fine? :<
+        // they either did something wrong or called EXIT through commands :>
+        int clientSocket = accept(serverSocket, nullptr, nullptr);
+        int f = fork();
+        if (!f) {
+            clientHandle(clientSocket);
+        }
+        else {
+            close(clientSocket);
         }
 
     }
