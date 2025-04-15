@@ -35,41 +35,41 @@ int main() {
     CPoint pubKey;
     CPoint serverPub;
     CPoint symm;
+    char buffer[26 * sizeof(CPoint)] = { 0 };
+    char storage[26 * sizeof(CPoint)] = { 0 };
+    char message[26 * sizeof(CPoint)] = { 0 };
     generateKeyPair(&pubKey, &privateKey, gen);
+    {
+        CPoint *tmp = (CPoint*)buffer;
+        tmp[0] = pubKey;
+        cout << sizeof(CPoint) << endl;
+        cout << (long long)pubKey.x << ":" << (long long )pubKey.y << endl;
+        cout << (long long)tmp[0].x << ":" << (long long )tmp[0].y << endl;
+        int x = send(sd, buffer, sizeof(buffer), 0);
+        cout << "sent" << endl;
+        cout << x << endl;
+        recv(sd, buffer, sizeof(buffer), 0);
+        serverPub = ((CPoint *)buffer)[0];
+        cout << (long long)serverPub.x << ":" << (long long)serverPub.y << endl;
+        if (!verifyPublicKey(&serverPub)) {
+            close(sd);
+            delete hints;
+            return 0;
+        }
+        setPublicKey(&serverPub);
+        symm = multPrivate(&serverPub);
+        if (serverPub.isInfinity) {
+            cout << "no no good" << endl;
+        }
+    }
     while (true) {
         bool esc = false;
-        char buffer[26 * sizeof(CPoint)] = { 0 };
-        char storage[26 * sizeof(CPoint)] = { 0 };
-        char message[26 * sizeof(CPoint)] = { 0 };
         std::string readLine;
         char switchCase;
         cout << "Input command type" << endl;
         cin >> switchCase;
         send(sd, &switchCase, sizeof(switchCase), 0);
         switch(switchCase) {
-            case('0'): {
-                CPoint *tmp = (CPoint*)buffer;
-                tmp[0] = pubKey;
-                cout << sizeof(CPoint) << endl;
-                cout << (long long)pubKey.x << ":" << (long long )pubKey.y << endl;
-                cout << (long long)tmp[0].x << ":" << (long long )tmp[0].y << endl;
-                int x = send(sd, buffer, sizeof(buffer), 0);
-                cout << "sent" << endl;
-                cout << x << endl;
-                recv(sd, buffer, sizeof(buffer), 0);
-                serverPub = ((CPoint *)buffer)[0];
-                cout << (long long)serverPub.x << ":" << (long long)serverPub.y << endl;
-                if (!verifyPublicKey(&serverPub)) {
-                    esc = true;
-                    break;
-                }
-                setPublicKey(&serverPub);
-                symm = multPrivate(&serverPub);
-                if (serverPub.isInfinity) {
-                    cout << "no no good" << endl;
-                }
-            }
-                break;
             case('1'): {
                 cout << "Input username" << endl;
                 cin >> readLine;

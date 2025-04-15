@@ -73,6 +73,29 @@ int main(){
         //just leave it blank or override it with 0s if its past your message length please :>
         char message[26 * sizeof(CPoint)] = { 0 }; 
         char buffer[26 * sizeof(CPoint)]  = { 0 }; 
+        { // Starting connection exchanging ECC public keys for symetric key distribution
+            cout << "key transfer\n" << endl;
+            recv(clientSocket, buffer, sizeof(buffer), 0);
+            cout << "received" << endl;
+            CPoint *tmp = (CPoint *)buffer;
+            clientPub = tmp[0];
+            cout << (long long )tmp[0].x << ":" << (long long )tmp[0].y << endl;
+            cout << (long long )clientPub.x << ":" << (long long )clientPub.y << endl;
+            if (!verifyPublicKey(&clientPub)) {
+                cout << "cant verify" << endl;
+                close(clientSocket);
+                break;
+            }
+            setPublicKey(&clientPub);
+            symm = multPrivate(&clientPub);
+            tmp[0] = pubKey;
+            cout << "sending" << endl;
+            cout << (long long )tmp[0].x << ":" << (long long )tmp[0].y << endl;
+            send(clientSocket, buffer, sizeof(buffer), 0); 
+            if (clientPub.isInfinity) {
+                std::cout << "no no good" << std::endl;
+            }
+        }
         //clients will send data in chunks of 128 of 8 bits = 1024 bits
         //lots of data, good for stuff.
         //being defined here also clears it from previous session
@@ -82,33 +105,12 @@ int main(){
         //recv(clientSocket, buffer, sizeof(buffer), 0);
         while(true){ // ~~~~~~~~~~~ CLIENT IS ACCEPTED AND IS NOW BEING TAKEN CARE OF ~~~~~~~~~~~~~
             bool esc = false;
-            int x = recv(clientSocket, &switchcase, sizeof(switchcase), 0);
+            if (recv(clientSocket, &switchcase, sizeof(switchcase), 0) == 0) {
+                close(clientSocket);
+                break;
+            }
             cout << switchcase << endl;
             switch (switchcase) {
-                case('0'): { // Starting connection exchanging ECC public keys for symetric key distribution
-                    cout << "key transfer\n" << endl;
-                    recv(clientSocket, buffer, sizeof(buffer), 0);
-                    cout << "received" << endl;
-                    CPoint *tmp = (CPoint *)buffer;
-                    clientPub = tmp[0];
-                    cout << (long long )tmp[0].x << ":" << (long long )tmp[0].y << endl;
-                    cout << (long long )clientPub.x << ":" << (long long )clientPub.y << endl;
-                    if (!verifyPublicKey(&clientPub)) {
-                        cout << "cant verify" << endl;
-                        esc = true;
-                        break;
-                    }
-                    setPublicKey(&clientPub);
-                    symm = multPrivate(&clientPub);
-                    tmp[0] = pubKey;
-                    cout << "sending" << endl;
-                    cout << (long long )tmp[0].x << ":" << (long long )tmp[0].y << endl;
-                    send(clientSocket, buffer, sizeof(buffer), 0); 
-                    if (clientPub.isInfinity) {
-                        std::cout << "no no good" << std::endl;
-                    }
-                }
-                    break;
                 case('1'): { // still using priv public keys, verify password and username against database
                     cout << "recv: " << recv(clientSocket, buffer, sizeof(buffer), 0) << endl;
                     CPoint *mes = (CPoint *)buffer;
@@ -219,6 +221,7 @@ int main(){
             //exit was called and thus we must accept a new client, thus breaking this loop
             if(esc){ 
                 generateKeyPair(&pubKey, &privateKey, gen);
+                close(clientSocket);
                 break;
             }
         }
