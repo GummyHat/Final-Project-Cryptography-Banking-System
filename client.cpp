@@ -162,16 +162,6 @@ int main() {
         char switchCase;
         cout << "Input command type" << endl;
         cin >> switchCase;
-        send(sd, &switchCase, sizeof(switchCase), 0);
-        switch(switchCase) {
-            case('2'):
-
-                break;
-            case('3'):
-                esc = true;
-                break;
-            
-        }
         if (esc) {
             break;
         }

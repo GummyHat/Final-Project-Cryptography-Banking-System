@@ -181,13 +181,6 @@ void * clientHandle(void * newSock) {
                 break;
             }
              cout << switchcase << endl;
-             switch (switchcase) {
-                case('2'): // taking in client requests, parsing them ensuring compliance
-                        //Take in the ECC symmetric key
-                        //Take in the message
-                        //Return the ciphertext
-                        //Buffer is what the client sends to you
-                        //message is what is sent back
                 unsigned char TDES_Key[24];
                 memcpy(TDES_Key, &clientPub.x, 16);
                 memcpy(TDES_Key + 16, &clientPub.y, 8);
@@ -214,6 +207,7 @@ void * clientHandle(void * newSock) {
                 if(sentHash.compare(hashedMac) != 0){
                     //they do not equal. issue
                     esc = true;
+                    close(clientSocket);
                     break;
                 }
 
@@ -258,6 +252,7 @@ void * clientHandle(void * newSock) {
                 else if (request == 3) // EXIT
                 {
                     esc = true;
+                    close(clientSocket);
                     break;
                 }
 
@@ -272,7 +267,6 @@ void * clientHandle(void * newSock) {
         //             break;
         //         default: // SHOULD NOT BE REACHED
         //             break;
-             }
 
         //     //exit was called and thus we must accept a new client, thus breaking this loop
             if(esc){ 
