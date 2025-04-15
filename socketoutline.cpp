@@ -65,6 +65,7 @@ int main(){
         
         // I assume overwriting clientsocket waiting for accept() to go through is.... fine? :<
         // they either did something wrong or called EXIT through commands :>
+        accepting:
         int clientSocket = accept(serverSocket, nullptr, nullptr);
         char switchcase = 0;
         
@@ -96,6 +97,104 @@ int main(){
                 std::cout << "no no good" << std::endl;
             }
         }
+        { // still using priv public keys, verify password and username against database
+            cout << "recv: " << recv(clientSocket, buffer, sizeof(buffer), 0) << endl;
+            CPoint *mes = (CPoint *)buffer;
+            for (int i = 0; i < 20; ++i) {
+                if (!verifyPublicKey(mes + i)) {
+                    close(clientSocket);
+                    goto accepting;
+                }
+            }
+            eccDecrypt(mes, 13, (CPoint *)message);
+            convertToMessage((CPoint *)message, 13, (char *)buffer);
+            char size = buffer[4];
+            char *cur = buffer + 5 + size;
+            unsigned int timestamp = *((unsigned int*)buffer);
+            cout << timestamp << endl;
+            if (time(NULL) - timestamp > 1000000) {
+                cout << "bad timestamp" << endl;
+                close(clientSocket);
+                goto accepting;
+            }
+            string username;
+            for (int i = 0; i < size + 5; ++i) {
+                username.push_back(buffer[i]);
+            }
+            string hmac = createMAC(username, std::bitset<56UL>(59693));
+            hmac = Hex_To_Binary(hmac);
+            std::string clientMac;
+            for (int i = 0; i < 20; ++i) {
+                clientMac.push_back(cur[i]);
+            }
+            // for (int i = 0; i < 20; ++i) {
+            //     cout << (hmac[i] == cur[i]) << ":" << bitset<8>(hmac[i]) << ":" << bitset<8>(cur[i]) << endl;
+            // }
+            cout << "macSize: " << hmac.size() << endl;
+            if (hmac.compare(clientMac) != 0) {
+                cout << "MACCING" << endl;
+                close(clientSocket);
+                goto accepting;
+            }
+            recv(clientSocket, buffer, sizeof(buffer), 0);
+            mes = (CPoint *)buffer;
+            for (int i = 0; i < 20; ++i) {
+                if (!verifyPublicKey(mes + i)) {
+                    close(clientSocket);
+                    goto accepting;
+                    break;
+                }
+            }
+            eccDecrypt(mes, 13, (CPoint *)message);
+            convertToMessage((CPoint *)message, 13, (char *)buffer);
+            size = buffer[4];
+            cur = buffer + 5 + size;
+            timestamp = *((unsigned int*)buffer);
+            cout << timestamp << endl;
+            if (time(NULL) - timestamp > 1000000) {
+                cout << "bad timestamp" << endl;
+                close(clientSocket);
+                goto accepting;
+                break;
+            }
+            string password;
+            for (int i = 0; i < size + 5; ++i) {
+                password.push_back(buffer[i]);
+            }
+            hmac = createMAC(password, std::bitset<56UL>(59693));
+            hmac = Hex_To_Binary(hmac);
+            clientMac.clear();
+            for (int i = 0; i < 20; ++i) {
+                clientMac.push_back(cur[i]);
+            }
+            // for (int i = 0; i < 20; ++i) {
+            //     cout << (hmac[i] == cur[i]) << ":" << bitset<8>(hmac[i]) << ":" << bitset<8>(cur[i]) << endl;
+            // }
+            cout << "macSize: " << hmac.size() << endl;
+            if (hmac.compare(clientMac) != 0) {
+                cout << "MACCING" << endl;
+                close(clientSocket);
+                goto accepting;
+            }
+            username.erase(0, 5);
+            password.erase(0, 5);
+            password = Binary_To_Hex(password);
+            cout << username << ":" << password << endl;
+            bool logged = false;
+            for (int i = 0; i < database.size(); ++i) {
+                cout << database[i].name << ":" << database[i].hash << endl;
+                if (database[i].name == username && database[i].hash == password) {
+                    cout << "WE LOOGGED" << endl;
+                    curUser = &database[i];
+                    logged = true;
+                    break;
+                }
+            }
+            if (!logged) {
+                close(clientSocket);
+                goto accepting;
+            }
+        }
         //clients will send data in chunks of 128 of 8 bits = 1024 bits
         //lots of data, good for stuff.
         //being defined here also clears it from previous session
@@ -111,187 +210,90 @@ int main(){
             }
             cout << switchcase << endl;
             switch (switchcase) {
-                case('1'): { // still using priv public keys, verify password and username against database
-                    cout << "recv: " << recv(clientSocket, buffer, sizeof(buffer), 0) << endl;
-                    CPoint *mes = (CPoint *)buffer;
-                    for (int i = 0; i < 20; ++i) {
-                        if (!verifyPublicKey(mes + i)) {
-                            esc = true;
-                            break;
-                        }
-                    }
-                    if (esc) {
-                        break;
-                    }
-                    eccDecrypt(mes, 13, (CPoint *)message);
-                    convertToMessage((CPoint *)message, 13, (char *)buffer);
-                    char size = buffer[4];
-                    char *cur = buffer + 5 + size;
-                    unsigned int timestamp = *((unsigned int*)buffer);
-                    cout << timestamp << endl;
-                    if (time(NULL) - timestamp > 1000000) {
-                        cout << "bad timestamp" << endl;
-                        esc = true;
-                        break;
-                    }
-                    string username;
-                    for (int i = 0; i < size + 5; ++i) {
-                        username.push_back(buffer[i]);
-                    }
-                    string hmac = createMAC(username, std::bitset<56UL>(59693));
-                    hmac = Hex_To_Binary(hmac);
-                    std::string clientMac;
-                    for (int i = 0; i < 20; ++i) {
-                        clientMac.push_back(cur[i]);
-                    }
-                    // for (int i = 0; i < 20; ++i) {
-                    //     cout << (hmac[i] == cur[i]) << ":" << bitset<8>(hmac[i]) << ":" << bitset<8>(cur[i]) << endl;
-                    // }
-                    cout << "macSize: " << hmac.size() << endl;
-                    if (hmac.compare(clientMac) != 0) {
-                        cout << "MACCING" << endl;
-                        esc = true;
-                        break;
-                    }
-                    recv(clientSocket, buffer, sizeof(buffer), 0);
-                    mes = (CPoint *)buffer;
-                    for (int i = 0; i < 20; ++i) {
-                        if (!verifyPublicKey(mes + i)) {
-                            esc = true;
-                            break;
-                        }
-                    }
-                    if (esc) {
-                        break;
-                    }
-                    eccDecrypt(mes, 13, (CPoint *)message);
-                    convertToMessage((CPoint *)message, 13, (char *)buffer);
-                    size = buffer[4];
-                    cur = buffer + 5 + size;
-                    timestamp = *((unsigned int*)buffer);
-                    cout << timestamp << endl;
-                    if (time(NULL) - timestamp > 1000000) {
-                        cout << "bad timestamp" << endl;
-                        esc = true;
-                        break;
-                    }
-                    string password;
-                    for (int i = 0; i < size + 5; ++i) {
-                        password.push_back(buffer[i]);
-                    }
-                    hmac = createMAC(password, std::bitset<56UL>(59693));
-                    hmac = Hex_To_Binary(hmac);
-                    clientMac.clear();
-                    for (int i = 0; i < 20; ++i) {
-                        clientMac.push_back(cur[i]);
-                    }
-                    // for (int i = 0; i < 20; ++i) {
-                    //     cout << (hmac[i] == cur[i]) << ":" << bitset<8>(hmac[i]) << ":" << bitset<8>(cur[i]) << endl;
-                    // }
-                    cout << "macSize: " << hmac.size() << endl;
-                    if (hmac.compare(clientMac) != 0) {
-                        cout << "MACCING" << endl;
-                        esc = true;
-                        break;
-                    }
-                    username.erase(0, 5);
-                    password.erase(0, 5);
-                    password = Binary_To_Hex(password);
-                    cout << username << ":" << password << endl;
-                    for (int i = 0; i < database.size(); ++i) {
-                        cout << database[i].name << ":" << database[i].hash << endl;
-                        if (database[i].name == username && database[i].hash == password) {
-                            cout << "WE LOOGGED" << endl;
-                            curUser = &database[i];
-                            break;
-                        }
-                    }
-                    break;
-                }
-                case('2'): { // taking in client requests, parsing them ensuring compliance
-                    //Take in the ECC symmetric key
-                    //Take in the message
-                    //Return the ciphertext
-                    //Buffer is what the client sends to you
-                    //message is what is sent back
-                    unsigned char TDES_Key[24];
-                    memcpy(TDES_Key, &clientPub.x, 16);
-                    memcpy(TDES_Key + 16, &clientPub.y, 8);
+                // case('2'): { // taking in client requests, parsing them ensuring compliance
+                //     //Take in the ECC symmetric key
+                //     //Take in the message
+                //     //Return the ciphertext
+                //     //Buffer is what the client sends to you
+                //     //message is what is sent back
+                //     unsigned char TDES_Key[24];
+                //     memcpy(TDES_Key, &clientPub.x, 16);
+                //     memcpy(TDES_Key + 16, &clientPub.y, 8);
     
-                    unsigned char Key1[7];
-                    for(int i = 0; i < 7; i++) {
-                        Key1[i] = Key[i];
-                    }
-                    memset(buffer, 0, sizeof(buffer));
-                    ssize_t bytes = recv(clientSocket, buffer, sizeof(buffer), 0);
+                //     unsigned char Key1[7];
+                //     for(int i = 0; i < 7; i++) {
+                //         Key1[i] = Key[i];
+                //     }
+                //     memset(buffer, 0, sizeof(buffer));
+                //     ssize_t bytes = recv(clientSocket, buffer, sizeof(buffer), 0);
     
-                    unsigned char decrypted[256];
-                    TDES_Decrypt_Bytes(buffer, message, sizeof(message), TDES_Key);
+                //     unsigned char decrypted[256];
+                //     TDES_Decrypt_Bytes(buffer, message, sizeof(message), TDES_Key);
     
-                    int request = (int)(decrypted[0]);
-                    int amountReq = (int*)(decrypted[1]);
-                    string messageInBin = "";
-                    for(int q = 0; q < 5;q++){
-                        messageInBin += decrypted[q];
-                    }
-                    string hashedMac = createMAC(messageInBin, Key1);
-                    string sentHash;
-                    memset(sentHash, decrypted[5], sizeof(char[20]));
-                    if(sentHash.compare(hashedMac) != 0){
-                        //they do not equal. issue
-                        esc = true;
-                        break;
-                    }
+                //     int request = (int)(decrypted[0]);
+                //     int amountReq = (int*)(decrypted[1]);
+                //     string messageInBin = "";
+                //     for(int q = 0; q < 5;q++){
+                //         messageInBin += decrypted[q];
+                //     }
+                //     string hashedMac = createMAC(messageInBin, Key1);
+                //     string sentHash;
+                //     memset(sentHash, decrypted[5], sizeof(char[20]));
+                //     if(sentHash.compare(hashedMac) != 0){
+                //         //they do not equal. issue
+                //         esc = true;
+                //         break;
+                //     }
     
-                    unsigned char cipherTextOut[256];
-                    memset(message, 0, sizeof(message)); // CLEAR MESSAGE
-                    if (request == 0) // CHECK BALANCE
-                    {
-                        int retMoney = curUser->money;
-                        memset(message[0],retMoney,sizeof(retMoney));
-                        std::string messageHex = to_string(message[0]) + to_string(message[1]) + to_string(message[2]) + to_string(message[3]);
-                        std::string hmac = createMAC(messageHex, Key1);
-                        memset(message[4],hmac,sizeof(hmac));
-                        TDES_Encrypt_Bytes(cipherTextOut, message, sizeof(message), TDES_Key);
-                    }
-                    else if (request == 1) // Deposit
-                    {
-                        if (amountReq <= 0) {
-                            message[0] = (char) 0;
-                        } else {
-                            curUser->money += amountReq;
-                            message[0] = (char) 1;
-                            std::string messageHex = to_string(message[0]);
-                            std::string hmac = createMAC(messageHex, Key1);
-                            memset(message[1], hmac, sizeof(hmac));
-                            int cipherTextOut;
-                            TDES_Encrypt_Bytes(cipherTextOut, message, sizeof(message), TDES_Key);
-                        }
-                    }
-                    else if (request == 2) // WITHDRAW
-                    {
-                        if (amountReq <= 0 && (curUser->money - amountReq >= 0)) {
-                            message[0] = (char) 0;
-                        } else {
-                            curUser->money -= amountReq;
-                            message[0] = (char) 1;
-                            std::string messageHex = to_string(message[0]);
-                            std::string hmac = createMAC(messageHex, Key1);
-                            memset(message[1], hmac, sizeof(hmac));
-                            int cipherTextOut;
-                            TDES_Encrypt_Bytes(cipherTextOut, message, sizeof(message), TDES_Key);
-                        }
-                    }
-                    else if (request == 3) // EXIT
-                    {
-                        esc = true;
-                        break;
-                    }
+                //     unsigned char cipherTextOut[256];
+                //     memset(message, 0, sizeof(message)); // CLEAR MESSAGE
+                //     if (request == 0) // CHECK BALANCE
+                //     {
+                //         int retMoney = curUser->money;
+                //         memset(message[0],retMoney,sizeof(retMoney));
+                //         std::string messageHex = to_string(message[0]) + to_string(message[1]) + to_string(message[2]) + to_string(message[3]);
+                //         std::string hmac = createMAC(messageHex, Key1);
+                //         memset(message[4],hmac,sizeof(hmac));
+                //         TDES_Encrypt_Bytes(cipherTextOut, message, sizeof(message), TDES_Key);
+                //     }
+                //     else if (request == 1) // Deposit
+                //     {
+                //         if (amountReq <= 0) {
+                //             message[0] = (char) 0;
+                //         } else {
+                //             curUser->money += amountReq;
+                //             message[0] = (char) 1;
+                //             std::string messageHex = to_string(message[0]);
+                //             std::string hmac = createMAC(messageHex, Key1);
+                //             memset(message[1], hmac, sizeof(hmac));
+                //             int cipherTextOut;
+                //             TDES_Encrypt_Bytes(cipherTextOut, message, sizeof(message), TDES_Key);
+                //         }
+                //     }
+                //     else if (request == 2) // WITHDRAW
+                //     {
+                //         if (amountReq <= 0 && (curUser->money - amountReq >= 0)) {
+                //             message[0] = (char) 0;
+                //         } else {
+                //             curUser->money -= amountReq;
+                //             message[0] = (char) 1;
+                //             std::string messageHex = to_string(message[0]);
+                //             std::string hmac = createMAC(messageHex, Key1);
+                //             memset(message[1], hmac, sizeof(hmac));
+                //             int cipherTextOut;
+                //             TDES_Encrypt_Bytes(cipherTextOut, message, sizeof(message), TDES_Key);
+                //         }
+                //     }
+                //     else if (request == 3) // EXIT
+                //     {
+                //         esc = true;
+                //         break;
+                //     }
     
                     
-                    send(clientSocket, cipherTextOut, sizeof(message), 0);
-                }
-                    break;         
+                //     send(clientSocket, cipherTextOut, sizeof(message), 0);
+                // }
+                //     break;         
 
                 case('3'): // exit for the client, clean up things that need clean up or returning data thats pending
                          // if message is all { 1 } consider this calling exit
