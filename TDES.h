@@ -22,7 +22,7 @@ std::bitset<28> leftCircularBitShift(const std::bitset<28>& input, const size_t 
 std::bitset<56> PC_Function(const std::bitset<64>& key);
 std::bitset<48> PC2_Function(const std::bitset<56>& key);
 std::string Hex_To_Binary(const std::string& hex);
-std::string Binary_To_Hex(const std::bitset<64>& binary);
+std::string Binary_To_Hex(const std::string& binary);
 
 
 
