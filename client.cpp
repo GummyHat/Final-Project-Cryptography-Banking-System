@@ -160,10 +160,51 @@ int main() {
     while (true) {
         bool esc = false;
         char switchCase;
-        cout << "Input command type" << endl;
+        cout << "Input command type(0 = checkBalance, 1 = Deposit, 2 = Withdraw, 3 = exit)" << endl;
         cin >> switchCase;
-        if (esc) {
+        switchCase = switchCase - '0';
+        if (switchCase == 3) {
             break;
+        }
+        unsigned char TDES_Key[24];
+        memcpy(TDES_Key, &symm.x, 16);
+        memcpy(TDES_Key + 16, &symm.y, 8);
+
+        unsigned long Key1 = 0;
+        for(int i = 0; i < 7; i++) {
+            ((char *)&Key1)[i] = TDES_Key[i];
+        }
+        memset(buffer, 0, sizeof(buffer));
+        if (switchCase == 0) {
+            std::string sender;
+            for (int i = 0; i < 5; ++i) {
+                sender += '\0';
+            }
+            cout << "SIZE: " << sender.size() << endl;
+            sender = createMAC(sender, Key1);
+            cout << sender << endl;
+            sender = Hex_To_Binary(sender);
+            sender.copy(buffer + 5, 20);
+            TDES_Encrypt_Bytes((unsigned char *)message, (unsigned char *)buffer, sizeof(buffer), TDES_Key);
+            send(sd, message, sizeof(message), 0);
+            recv(sd, message, sizeof(message), 0);
+            TDES_Decrypt_Bytes((unsigned char *)buffer, (unsigned char *)message, sizeof(buffer), TDES_Key);
+            int ammount = ((int *)buffer)[0];
+            cout << "money: " << ammount << endl;
+            std::string messageHex = to_string(buffer[0]) + to_string(buffer[1]) + to_string(buffer[2]) + to_string(buffer[3]);
+            messageHex = createMAC(messageHex, Key1);
+            messageHex = Hex_To_Binary(messageHex);
+            std::string other;
+            for (int i = 0; i < 20; ++i) {
+                other += buffer[i + 4];
+            }
+            if (other.compare(messageHex) != 0) {
+                cout << "bad hmac" << endl;
+                deinit();
+                close(sd);
+                delete hints;
+                exit(0);
+            }
         }
     }
     deinit();

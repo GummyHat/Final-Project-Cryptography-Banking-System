@@ -176,16 +176,16 @@ void * clientHandle(void * newSock) {
         //recv(clientSocket, buffer, sizeof(buffer), 0);
         while(true){ // ~~~~~~~~~~~ CLIENT IS ACCEPTED AND IS NOW BEING TAKEN CARE OF ~~~~~~~~~~~~~
              bool esc = false;
-            if (recv(clientSocket, &switchcase, sizeof(switchcase), 0) == 0) {
-                close(clientSocket);
-                break;
-            }
+            // if (recv(clientSocket, &switchcase, sizeof(switchcase), 0) == 0) {
+            //     close(clientSocket);
+            //     break;
+            // }
              cout << switchcase << endl;
                 unsigned char TDES_Key[24];
-                memcpy(TDES_Key, &clientPub.x, 16);
-                memcpy(TDES_Key + 16, &clientPub.y, 8);
+                memcpy(TDES_Key, &symm.x, 16);
+                memcpy(TDES_Key + 16, &symm.y, 8);
 
-                unsigned long Key1;
+                unsigned long Key1 = 0;
                 for(int i = 0; i < 7; i++) {
                     ((char *)&Key1)[i] = TDES_Key[i];
                 }
@@ -193,21 +193,26 @@ void * clientHandle(void * newSock) {
                 ssize_t bytes = recv(clientSocket, buffer, sizeof(buffer), 0);
 
                 unsigned char decrypted[256];
-                TDES_Decrypt_Bytes((unsigned char*) buffer, (unsigned char *) message, sizeof(message), TDES_Key);
-
-                int request = (int)(decrypted[0]);
-                int amountReq = (int)(decrypted[1]);
-                string messageInBin = "";
+                TDES_Decrypt_Bytes((unsigned char*) decrypted, (unsigned char *) buffer, sizeof(buffer), TDES_Key);
+                int request = decrypted[0];
+                int amountReq = ((int *)(decrypted + 1))[0];
+                string messageInBin;
                 for(int q = 0; q < 5;q++){
                     messageInBin += decrypted[q];
                 }
+                cout << "SIZE: " << messageInBin.size() << endl;
                 string hashedMac = createMAC(messageInBin, Key1);
+                cout << hashedMac << endl;
+                hashedMac = Hex_To_Binary(hashedMac);
                 string sentHash;
-                memset((void *)sentHash.c_str(), decrypted[5], sizeof(char[20]));
+                for (int i = 0; i < 20; ++i) {
+                    sentHash += decrypted[i + 5];
+                }
                 if(sentHash.compare(hashedMac) != 0){
                     //they do not equal. issue
                     esc = true;
                     close(clientSocket);
+                    cout << "bad hmac" << endl;
                     break;
                 }
 
@@ -216,10 +221,13 @@ void * clientHandle(void * newSock) {
                 if (request == 0) // CHECK BALANCE
                 {
                     int retMoney = curUser->money;
-                    memset(message,retMoney,sizeof(retMoney));
+                    ((int *)message)[0] = retMoney;
+                    cout << "money: " << retMoney << endl;
+                    //memset(message,retMoney,sizeof(retMoney));
                     std::string messageHex = to_string(message[0]) + to_string(message[1]) + to_string(message[2]) + to_string(message[3]);
                     std::string hmac = createMAC(messageHex, Key1);
-                    hmac.copy(message, hmac.size());
+                    hmac = Hex_To_Binary(hmac);
+                    hmac.copy(message + 4, 20);
                     //memset(message + 4,(void *)hmac.c_str(),hmac.size());
                     TDES_Encrypt_Bytes(cipherTextOut, (unsigned char *) message, sizeof(message), TDES_Key);
                 }
@@ -257,7 +265,7 @@ void * clientHandle(void * newSock) {
                 }
 
                 
-        //         send(clientSocket, cipherTextOut, sizeof(message), 0);
+                send(clientSocket, cipherTextOut, sizeof(cipherTextOut), 0);
                 
         //         break;       
 
