@@ -108,6 +108,40 @@ const int P_Box[32] = {
     13, 19,  2, 26, 10, 21, 28,  7
 };
 
+std::bitset<64> Bytes_To_Bitset(const unsigned char* bytes)
+{
+    std::bitset<64> output;
+    for (int i = 0; i < 8; i++)
+    {
+        for (int j = 0; j < 8; j++)
+        {
+            if ((bytes[i] >> (7 - j)) & 1)
+            {
+                output[63 - (i * 8 + j)] = 1;
+            } else
+            {
+                output[63 - (i * 8 + j)] = 0;
+            }
+        }
+    }
+    return output;
+}
+
+void Bitset_To_Bytes(const std::bitset<64>& bits, unsigned char* bytes)
+{
+    for (int i = 0; i < 8; i++)
+    {
+        bytes[i] = 0;
+        for (int j = 0; j < 8; j++)
+        {
+            if (bits[63 - (i * 8 + j)])
+            {
+                bytes[i] |= (1 << (7 - j));
+            }
+        }
+    }
+}
+
 std::bitset<64> generate_Ciphertext(const std::bitset<64>& plaintext, const std::bitset<128>& KeyX, const std::bitset<128> KeyY)
 {
     //Merge KeyX and KeyY
@@ -169,6 +203,152 @@ std::bitset<64> generate_Ciphertext(const std::bitset<64>& plaintext, const std:
     std::bitset<64> cipherText_3 = DES_Encrypt(cipherText_2, K3_SubKeys);
 
     return cipherText_3;
+}
+
+int TDES_Encrypt_Bytes(unsigned char* ciphertext_output, const unsigned char* plaintext, int plaintext_length, const unsigned char* key24bytes)
+{
+    std::bitset<64> Key1 = Bytes_To_Bitset(key24bytes);
+    std::bitset<64> Key2 = Bytes_To_Bitset(key24bytes + 8);
+    std::bitset<64> Key3 = Bytes_To_Bitset(key24bytes);
+
+    std::bitset<48> K1_SubKeys[16];
+    std::bitset<48> K2_SubKeys[16];
+    std::bitset<48> K3_SubKeys[16];
+
+    // Generating SubKeys below
+    std::bitset<56> P_K1 = PC_Function(Key1);
+    std::bitset<56> P_K2 = PC_Function(Key2);
+    std::bitset<56> P_K3 = PC_Function(Key3);
+    std::bitset<28> P_K1L,P_K1R;
+    std::bitset<28> P_K2L,P_K2R;
+    std::bitset<28> P_K3L,P_K3R;
+
+    for (int i = 0; i < 28; i++)
+    {
+        P_K1L[i] = P_K1[i];
+        P_K1R[i] = P_K1[i + 28];
+
+        P_K2L[i] = P_K2[i];
+        P_K2R[i] = P_K2[i + 28];
+
+        P_K3L[i] = P_K3[i];
+        P_K3R[i] = P_K3[i + 28];
+    }
+
+    for (int round = 0; round < 16; round++)
+    {
+        int shift = Shift_Schedule[round];
+        P_K1L = leftCircularBitShift(P_K1L, shift);
+        P_K1R = leftCircularBitShift(P_K1R, shift);
+        std::bitset<56> mergedKeys = mergeKeys(P_K1L, P_K1R);
+        K1_SubKeys[round] = PC2_Function(mergedKeys);
+
+        P_K2L = leftCircularBitShift(P_K2L, shift);
+        P_K2R = leftCircularBitShift(P_K2R, shift);
+        mergedKeys = mergeKeys(P_K2L, P_K2R);
+        K2_SubKeys[round] = PC2_Function(mergedKeys);
+
+        P_K3L = leftCircularBitShift(P_K3L, shift);
+        P_K3R = leftCircularBitShift(P_K3R, shift);
+        mergedKeys = mergeKeys(P_K3L, P_K3R);
+        K3_SubKeys[round] = PC2_Function(mergedKeys);
+    }
+
+    int padding = 8 - (plaintext_length % 8);
+    int padding_length = plaintext_length + padding;
+    std::vector<unsigned char> padded_plaintext(padding_length);
+    memcpy(padded_plaintext.data(), plaintext, plaintext_length);
+    for (int i = 0; i < padding; i++)
+    {
+        padded_plaintext[plaintext_length + i] = static_cast<unsigned char>(padding);
+    }
+
+    int ciphertext_length = 0;
+    for (int i = 0; i < padding_length; i += 8)
+    {
+        std::bitset<64> plaintextBlock = Bytes_To_Bitset(padded_plaintext.data() + i);
+        std::bitset<64> cipherBlock1 = DES_Encrypt(plaintextBlock, K1_SubKeys);
+        std::bitset<64> cipherBlock2 = DES_Decrypt(cipherBlock1, K2_SubKeys);
+        std::bitset<64> cipherBlock3 = DES_Encrypt(cipherBlock2, K3_SubKeys);
+
+        Bitset_To_Bytes(cipherBlock3, ciphertext_output + i);
+        ciphertext_length += 8;
+    }
+
+    return ciphertext_length;
+}
+
+int TDES_Decrypt_Bytes(unsigned char* plaintext_output, const unsigned char* ciphertext, int ciphertext_length, const unsigned char* key24bytes)
+{
+    std::bitset<64> Key1 = Bytes_To_Bitset(key24bytes);
+    std::bitset<64> Key2 = Bytes_To_Bitset(key24bytes + 8);
+    std::bitset<64> Key3 = Bytes_To_Bitset(key24bytes);
+
+    std::bitset<48> K1_SubKeys[16];
+    std::bitset<48> K2_SubKeys[16];
+    std::bitset<48> K3_SubKeys[16];
+
+    // Generating SubKeys below
+    std::bitset<56> P_K1 = PC_Function(Key1);
+    std::bitset<56> P_K2 = PC_Function(Key2);
+    std::bitset<56> P_K3 = PC_Function(Key3);
+    std::bitset<28> P_K1L,P_K1R;
+    std::bitset<28> P_K2L,P_K2R;
+    std::bitset<28> P_K3L,P_K3R;
+
+    for (int i = 0; i < 28; i++)
+    {
+        P_K1L[i] = P_K1[i];
+        P_K1R[i] = P_K1[i + 28];
+
+        P_K2L[i] = P_K2[i];
+        P_K2R[i] = P_K2[i + 28];
+
+        P_K3L[i] = P_K3[i];
+        P_K3R[i] = P_K3[i + 28];
+    }
+
+    for (int round = 15; round >= 0; round--)
+    {
+        int shift = Shift_Schedule[round];
+        P_K1L = leftCircularBitShift(P_K1L, shift);
+        P_K1R = leftCircularBitShift(P_K1R, shift);
+        std::bitset<56> mergedKeys = mergeKeys(P_K1L, P_K1R);
+        K1_SubKeys[round] = PC2_Function(mergedKeys);
+
+        P_K2L = leftCircularBitShift(P_K2L, shift);
+        P_K2R = leftCircularBitShift(P_K2R, shift);
+        mergedKeys = mergeKeys(P_K2L, P_K2R);
+        K2_SubKeys[round] = PC2_Function(mergedKeys);
+
+        P_K3L = leftCircularBitShift(P_K3L, shift);
+        P_K3R = leftCircularBitShift(P_K3R, shift);
+        mergedKeys = mergeKeys(P_K3L, P_K3R);
+        K3_SubKeys[round] = PC2_Function(mergedKeys);
+    }
+
+    int padding = 8 - (ciphertext_length % 8);
+    int padding_length = ciphertext_length + padding;
+    std::vector<unsigned char> padded_ciphertext(padding_length);
+    memcpy(padded_ciphertext.data(), ciphertext, ciphertext_length);
+    for (int i = 0; i < padding; i++)
+    {
+        padded_ciphertext[ciphertext_length + i] = static_cast<unsigned char>(padding);
+    }
+
+    int plaintext_length = 0;
+    for (int i = 0; i < padding_length; i += 8)
+    {
+        std::bitset<64> ciphertextBlock = Bytes_To_Bitset(padded_ciphertext.data() + i);
+        std::bitset<64> plainBlock1 = DES_Encrypt(ciphertextBlock, K1_SubKeys);
+        std::bitset<64> plainBlock2 = DES_Decrypt(plainBlock1, K2_SubKeys);
+        std::bitset<64> plainBlock3 = DES_Encrypt(plainBlock2, K3_SubKeys);
+
+        Bitset_To_Bytes(plainBlock3, plaintext_output + i);
+        plaintext_length += 8;
+    }
+
+    return plaintext_length;
 }
 
 std::bitset<64> DES_Encrypt(const std::bitset<64>& plaintext, const std::bitset<48> subkeys[16])
@@ -348,47 +528,16 @@ std::bitset<48> PC2_Function(const std::bitset<56>& key) {
     return output;
 }
 
-std::string Hex_To_Binary(const std::string& hex) {
-    //only using for hmac so always gonna be divisible by 2
-    std::string res;
-    for (int i = 0; i < hex.size(); i += 2) {
-        unsigned char cur = 0;
-        if (hex[i] >= '0' && hex[i] <= '9') {
-            cur = hex[i] - '0';
-        }
-        else if (hex[i] >= 'a' && hex[i] <= 'f') {
-            cur = hex[i] - 'a' + 10;
-        }
-        cur = cur << 4;
-        if (hex[i + 1] >= '0' && hex[i + 1] <= '9') {
-            cur += hex[i + 1] - '0';
-        }
-        else if (hex[i + 1] >= 'a' && hex[i + 1] <= 'f') {
-            cur += hex[i + 1] - 'a' + 10;
-        }
-        res.push_back(cur);
-    }
-    return res;
+std::bitset<64> Hex_To_Binary(const std::string& hex) {
+    unsigned long long decimal_value = std::stoull(hex, nullptr, 16);
+    std::bitset<64> output(decimal_value);
+    return output;
 }
 
-std::string Binary_To_Hex(const std::string& binary) {
-    std::string output;
-    char mask = (1 << 4) - 1;
-    for (int i = 0; i < binary.size(); ++i) {
-        unsigned char cur = (binary[i] >> 4) & mask;
-        if (cur < 10) {
-            output.push_back(cur + '0');
-        }
-        else if (cur >= 10) {
-            output.push_back(cur - 10 + 'a');
-        }
-        cur = binary[i] & mask;
-        if (cur < 10) {
-            output.push_back(cur + '0');
-        }
-        else if (cur >= 10) {
-            output.push_back(cur - 10 + 'a');
-        }
-    }
+std::string Binary_To_Hex(const std::bitset<64>& binary) {
+    unsigned long long decimal_value = binary.to_ullong();
+    std::stringstream ss;
+    ss << std::hex << std::setfill('0') << std::setw(16) << decimal_value;
+    std::string output = ss.str();
     return output;
 }
