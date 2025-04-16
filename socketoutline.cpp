@@ -21,12 +21,7 @@ using namespace std;
 
 void ExitHandle(int);
 int serverSocket;
-mutex mut;
 vector<user> database;
-__uint128_t privateKey;
-CPoint pubKey;
-CPoint clientPub;
-CPoint symm;
 
 bool isExit(const unsigned char text[64]){ //is the plaintext all one bits?
     for(int i = 0; i < 64; i++){
@@ -36,12 +31,44 @@ bool isExit(const unsigned char text[64]){ //is the plaintext all one bits?
     }
     return true;
 }
-void * clientHandle(void * newSock) {
-    int clientSocket = *((int *)newSock);
-    char switchcase = 0;
-    cstrand gen(getpid() + time(NULL) + (getppid()<<12), getpid() * time(NULL) ^ (getppid()<<12) );
 
+
+int main(){
+    database = readDatabase("database.csv");
+    signal(SIGINT, ExitHandle);
+
+    //~~~~~~~~~~~~~~~~~~~~~~~ SEVER BOILERPLATE ~~~~~~~~~~~~~~~~~~~~~~~~
+    serverSocket = socket(AF_INET, SOCK_STREAM, 0);
+    // specifying the address
+    sockaddr_in serverAddress;
+    serverAddress.sin_family = AF_INET;
+    serverAddress.sin_port = htons(8080);
+    serverAddress.sin_addr.s_addr = INADDR_ANY;
+    bind(serverSocket, (struct sockaddr*)&serverAddress,sizeof(serverAddress));
+    listen(serverSocket, 5);
+    cstrand gen(getpid() + time(NULL) + (getppid()<<12), getpid() * time(NULL) ^ (getppid()<<12) );
+    __uint128_t privateKey;
+    CPoint pubKey;
+    CPoint clientPub;
+    CPoint symm;
     user *curUser;
+    generateKeyPair(&pubKey, &privateKey, gen);
+
+    
+
+
+
+
+
+    while(true){ // ~~~~~~~~~ CLIENT ACCEPT LOOP ~~~~~~~~~~~~. SEVERS ARE NOT EXPECTED TO GO DOWN
+        //we assume there is no client to start this loop
+        
+        // I assume overwriting clientsocket waiting for accept() to go through is.... fine? :<
+        // they either did something wrong or called EXIT through commands :>
+        accepting:
+        int clientSocket = accept(serverSocket, nullptr, nullptr);
+        char switchcase = 0;
+    
         //for these this should be a loop taking 8 bits over and over and casting it 0-255. 
         //just leave it blank or override it with 0s if its past your message length please :>
         char message[26 * sizeof(CPoint)] = { 0 }; 
@@ -57,7 +84,7 @@ void * clientHandle(void * newSock) {
             if (!verifyPublicKey(&clientPub)) {
                 cout << "cant verify" << endl;
                 close(clientSocket);
-                pthread_exit(0);
+                goto accepting;
             }
             setPublicKey(&clientPub);
             symm = multPrivate(&clientPub);
@@ -75,7 +102,7 @@ void * clientHandle(void * newSock) {
             for (int i = 0; i < 20; ++i) {
                 if (!verifyPublicKey(mes + i)) {
                     close(clientSocket);
-                    pthread_exit(0);
+                    goto accepting;
                 }
             }
             eccDecrypt(mes, 13, (CPoint *)message);
@@ -87,7 +114,7 @@ void * clientHandle(void * newSock) {
             if (time(NULL) - timestamp > 1000000) {
                 cout << "bad timestamp" << endl;
                 close(clientSocket);
-                exit(0);
+                goto accepting;
             }
             string username;
             for (int i = 0; i < size + 5; ++i) {
@@ -106,14 +133,14 @@ void * clientHandle(void * newSock) {
             if (hmac.compare(clientMac) != 0) {
                 cout << "MACCING" << endl;
                 close(clientSocket);
-                pthread_exit(0);
+                goto accepting;
             }
             recv(clientSocket, buffer, sizeof(buffer), 0);
             mes = (CPoint *)buffer;
             for (int i = 0; i < 20; ++i) {
                 if (!verifyPublicKey(mes + i)) {
                     close(clientSocket);
-                    pthread_exit(0);
+                    goto accepting;
                 }
             }
             eccDecrypt(mes, 13, (CPoint *)message);
@@ -125,7 +152,7 @@ void * clientHandle(void * newSock) {
             if (time(NULL) - timestamp > 1000000) {
                 cout << "bad timestamp" << endl;
                 close(clientSocket);
-                pthread_exit(0);
+                goto accepting;
             }
             string password;
             for (int i = 0; i < size + 5; ++i) {
@@ -144,14 +171,13 @@ void * clientHandle(void * newSock) {
             if (hmac.compare(clientMac) != 0) {
                 cout << "MACCING" << endl;
                 close(clientSocket);
-                pthread_exit(0);
+                goto accepting;
             }
             username.erase(0, 5);
             password.erase(0, 5);
             password = Binary_To_Hex(password);
             cout << username << ":" << password << endl;
             bool logged = false;
-            mut.lock();
             for (int i = 0; i < database.size(); ++i) {
                 cout << database[i].name << ":" << database[i].hash << endl;
                 if (database[i].name == username && database[i].hash == password) {
@@ -161,10 +187,9 @@ void * clientHandle(void * newSock) {
                     break;
                 }
             }
-            mut.unlock();
             if (!logged) {
                 close(clientSocket);
-                pthread_exit(0);
+                goto accepting;
             }
         }
         //clients will send data in chunks of 128 of 8 bits = 1024 bits
@@ -229,6 +254,10 @@ void * clientHandle(void * newSock) {
                     cout << "money: " << retMoney << endl;
                     //memset(message,retMoney,sizeof(retMoney));
                     std::string messageHex = to_string(message[0]) + to_string(message[1]) + to_string(message[2]) + to_string(message[3]);
+                    // std::string messageHex;
+                    // for (int i = 0; i < 4; ++i) {
+                    //     messageHex += message[i];
+                    // }
                     std::string hmac = createMAC(messageHex, Key1);
                     hmac = Hex_To_Binary(hmac);
                     hmac.copy(message + 4, 20);
@@ -306,42 +335,6 @@ void * clientHandle(void * newSock) {
                 break;
             }
         }
-        return NULL;
-}
-
-
-int main(){
-    database = readDatabase("database.csv");
-    signal(SIGINT, ExitHandle);
-
-    //~~~~~~~~~~~~~~~~~~~~~~~ SEVER BOILERPLATE ~~~~~~~~~~~~~~~~~~~~~~~~
-    serverSocket = socket(AF_INET, SOCK_STREAM, 0);
-    // specifying the address
-    sockaddr_in serverAddress;
-    serverAddress.sin_family = AF_INET;
-    serverAddress.sin_port = htons(8080);
-    serverAddress.sin_addr.s_addr = INADDR_ANY;
-    bind(serverSocket, (struct sockaddr*)&serverAddress,sizeof(serverAddress));
-    listen(serverSocket, 5);
-    cstrand gen(getpid() + time(NULL) + (getppid()<<12), getpid() * time(NULL) ^ (getppid()<<12) );
-    generateKeyPair(&pubKey, &privateKey, gen);
-
-
-    
-
-
-
-
-
-    while(true){ // ~~~~~~~~~ CLIENT ACCEPT LOOP ~~~~~~~~~~~~. SEVERS ARE NOT EXPECTED TO GO DOWN
-        //we assume there is no client to start this loop
-        
-        // I assume overwriting clientsocket waiting for accept() to go through is.... fine? :<
-        // they either did something wrong or called EXIT through commands :>
-        int clientSocket = accept(serverSocket, nullptr, nullptr);
-        pthread_t newThread;
-        pthread_create(&newThread, NULL, clientHandle, (void *)&clientSocket);
-        pthread_detach(newThread);
 
     }
     deinit();
