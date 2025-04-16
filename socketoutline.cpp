@@ -196,8 +196,8 @@ void * clientHandle(void * newSock) {
                 TDES_Decrypt_Bytes((unsigned char*) decrypted, (unsigned char *) buffer, sizeof(buffer), TDES_Key);
                 int request = decrypted[0];
                 int amountReq = ((int *)(decrypted + 1))[0];
-                long int timeSp = ((long int *)(decrypted + 5))[0];
-                long int curtime = time(NULL);
+                time_t timeSp = ((time_t *)(decrypted + 5))[0];
+                time_t curtime = time(NULL);
                 string messageInBin;
                 for(int q = 0; q < 13;q++){
                     messageInBin += decrypted[q];
@@ -210,6 +210,7 @@ void * clientHandle(void * newSock) {
                 for (int i = 0; i < 20; ++i) {
                     sentHash += decrypted[i + 13];
                 }
+                cout << "sub: " << curtime - timeSp << endl << "curtime: " << timeSp << endl;
                 if(sentHash.compare(hashedMac) != 0 || curtime-timeSp >= 120){
                     //they do not equal. issue
                     esc = true;

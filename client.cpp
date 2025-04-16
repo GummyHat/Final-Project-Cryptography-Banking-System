@@ -181,9 +181,11 @@ int main() {
                 sender += '\0';
             }
             time_t t = time(NULL);
+            cout << "curtime: " << t << endl;
             for (int i = 0; i < 8; ++i) {
                 sender += ((char *)(&t))[i];
             }
+            ((time_t *)(buffer + 5))[0] = t;
             cout << "SIZE: " << sender.size() << endl;
             sender = createMAC(sender, Key1);
             cout << sender << endl;
