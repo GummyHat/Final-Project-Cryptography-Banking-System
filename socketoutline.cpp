@@ -196,8 +196,10 @@ void * clientHandle(void * newSock) {
                 TDES_Decrypt_Bytes((unsigned char*) decrypted, (unsigned char *) buffer, sizeof(buffer), TDES_Key);
                 int request = decrypted[0];
                 int amountReq = ((int *)(decrypted + 1))[0];
+                long int timeSp = ((long int *)(decrypted + 5))[0];
+                long int curtime = time(NULL);
                 string messageInBin;
-                for(int q = 0; q < 5;q++){
+                for(int q = 0; q < 13;q++){
                     messageInBin += decrypted[q];
                 }
                 cout << "SIZE: " << messageInBin.size() << endl;
@@ -206,9 +208,9 @@ void * clientHandle(void * newSock) {
                 hashedMac = Hex_To_Binary(hashedMac);
                 string sentHash;
                 for (int i = 0; i < 20; ++i) {
-                    sentHash += decrypted[i + 5];
+                    sentHash += decrypted[i + 13];
                 }
-                if(sentHash.compare(hashedMac) != 0){
+                if(sentHash.compare(hashedMac) != 0 || curtime-timeSp >= 120){
                     //they do not equal. issue
                     esc = true;
                     close(clientSocket);
@@ -234,15 +236,21 @@ void * clientHandle(void * newSock) {
                 else if (request == 1) // Deposit
                 {
                     if (amountReq <= 0) {
-                        message[0] = (char) 0;
+                         message[0] = (char) 0;
                     } else {
                         curUser->money += amountReq;
                         message[0] = (char) 1;
-                        std::string messageHex = to_string(message[0]);
-                        std::string hmac = createMAC(messageHex, Key1);
-                        hmac.copy(message, hmac.size());
-                        TDES_Encrypt_Bytes(cipherTextOut, (unsigned char *) message, sizeof(message), TDES_Key);
                     }
+                    message[1] = (char)gen.getNxt();
+                    message[2] = (char)gen.getNxt();
+                    message[3] = (char)gen.getNxt();
+                    message[4] = (char)gen.getNxt();
+                    std::string messageHex = to_string(message[0]) + to_string(message[1]) + to_string(message[2]) + to_string(message[3]) + to_string(message[4]);
+                    std::string messageHex = to_string(message[0]);
+                    std::string hmac = createMAC(messageHex, Key1);
+                    hmac = hex_to_binary(hmac);
+                    hmac.copy(message+5, 20);
+                    TDES_Encrypt_Bytes(cipherTextOut, (unsigned char *) message, sizeof(message), TDES_Key);
                 }
                 else if (request == 2) // WITHDRAW
                 {
@@ -251,11 +259,16 @@ void * clientHandle(void * newSock) {
                     } else {
                         curUser->money -= amountReq;
                         message[0] = (char) 1;
-                        std::string messageHex = to_string(message[0]);
-                        std::string hmac = createMAC(messageHex, Key1);
-                        hmac.copy(message, hmac.size());
-                        TDES_Encrypt_Bytes(cipherTextOut, (unsigned char *)message, sizeof(message), TDES_Key);
                     }
+                    message[1] = (char)gen.getNxt();
+                    message[2] = (char)gen.getNxt();
+                    message[3] = (char)gen.getNxt();
+                    message[4] = (char)gen.getNxt();
+                    std::string messageHex = to_string(message[0]) + to_string(message[1]) + to_string(message[2]) + to_string(message[3]) + to_string(message[4]);
+                    std::string hmac = createMAC(messageHex, Key1);
+                    hmac = hex_to_binary(hmac);
+                    hmac.copy(message+5, 20);
+                    TDES_Encrypt_Bytes(cipherTextOut, (unsigned char *)message, sizeof(message), TDES_Key);
                 }
                 else if (request == 3) // EXIT
                 {
