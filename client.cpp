@@ -219,10 +219,12 @@ int main() {
             buffer[0] = 1;
             ((int*)(buffer + 1))[0] = atoi(sender.c_str());
             ((time_t*)(buffer + 5))[0] = time(NULL);
+            cout << "curtime: " << ((time_t*)(buffer + 5))[0] << endl;
             sender.clear();
             for (int i = 0; i < 13; ++i) {
                 sender.push_back(buffer[i]);
             }
+            cout << "sender size: " <<  sender.size() << endl;
             sender = createMAC(sender, Key1);
             sender = Hex_To_Binary(sender);
             sender.copy(buffer + 13, 20);
@@ -235,8 +237,9 @@ int main() {
                 messageHex += buffer[i];
             }
             messageHex = createMAC(messageHex, Key1);
+            cout << "please god: " << messageHex << endl;
             messageHex = Hex_To_Binary(messageHex);
-            int ammount = ((int *)buffer)[0];
+            char ammount = buffer[0];
             std::string other;
             for (int i = 0; i < 20; ++i) {
                 other += buffer[i + 5];
@@ -280,7 +283,7 @@ int main() {
             }
             messageHex = createMAC(messageHex, Key1);
             messageHex = Hex_To_Binary(messageHex);
-            int ammount = ((int *)buffer)[0];
+            char ammount = buffer[0];
             std::string other;
             for (int i = 0; i < 20; ++i) {
                 other += buffer[i + 5];

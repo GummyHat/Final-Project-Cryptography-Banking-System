@@ -195,6 +195,7 @@ void * clientHandle(void * newSock) {
                 unsigned char decrypted[256];
                 TDES_Decrypt_Bytes((unsigned char*) decrypted, (unsigned char *) buffer, sizeof(buffer), TDES_Key);
                 int request = decrypted[0];
+                cout << "request: " << request << endl;
                 int amountReq = ((int *)(decrypted + 1))[0];
                 time_t timeSp = ((time_t *)(decrypted + 5))[0];
                 time_t curtime = time(NULL);
@@ -218,7 +219,7 @@ void * clientHandle(void * newSock) {
                     cout << "bad hmac" << endl;
                     break;
                 }
-
+                cout << "WE MADE IT" << endl;
                 unsigned char cipherTextOut[256];
                 memset(message, 0, sizeof(message)); // CLEAR MESSAGE
                 if (request == 0) // CHECK BALANCE
@@ -246,8 +247,13 @@ void * clientHandle(void * newSock) {
                     message[2] = (char)gen.getNxt();
                     message[3] = (char)gen.getNxt();
                     message[4] = (char)gen.getNxt();
-                    std::string messageHex = to_string(message[0]) + to_string(message[1]) + to_string(message[2]) + to_string(message[3]) + to_string(message[4]);
+                    //std::string messageHex = to_string(message[0]) + to_string(message[1]) + to_string(message[2]) + to_string(message[3]) + to_string(message[4]);
+                    std::string messageHex;
+                    for (int i = 0; i < 5; ++i) {
+                        messageHex.push_back(message[i]);
+                    }
                     std::string hmac = createMAC(messageHex, Key1);
+                    cout << "please god: " << hmac << endl;
                     hmac = Hex_To_Binary(hmac);
                     hmac.copy(message+5, 20);
                     TDES_Encrypt_Bytes(cipherTextOut, (unsigned char *) message, sizeof(message), TDES_Key);
@@ -264,7 +270,11 @@ void * clientHandle(void * newSock) {
                     message[2] = (char)gen.getNxt();
                     message[3] = (char)gen.getNxt();
                     message[4] = (char)gen.getNxt();
-                    std::string messageHex = to_string(message[0]) + to_string(message[1]) + to_string(message[2]) + to_string(message[3]) + to_string(message[4]);
+                    //std::string messageHex = to_string(message[0]) + to_string(message[1]) + to_string(message[2]) + to_string(message[3]) + to_string(message[4]);
+                    std::string messageHex;
+                    for (int i = 0; i < 5; ++i) {
+                        messageHex.push_back(message[i]);
+                    }
                     std::string hmac = createMAC(messageHex, Key1);
                     hmac = Hex_To_Binary(hmac);
                     hmac.copy(message+5, 20);
