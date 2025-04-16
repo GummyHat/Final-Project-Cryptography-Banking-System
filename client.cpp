@@ -263,7 +263,7 @@ int main() {
             cout << "Input Withdraw ammount" << endl;
             std::string sender;
             cin >> sender;
-            buffer[0] = 1;
+            buffer[0] = 2;
             ((int*)(buffer + 1))[0] = atoi(sender.c_str());
             ((time_t*)(buffer + 5))[0] = time(NULL);
             sender.clear();
@@ -296,7 +296,7 @@ int main() {
                 exit(0);
             }
             if (ammount != 0) {
-                cout << "You have withdrawn: " << ammount << endl;
+                cout << "You have withdrawn successfully" << endl;
             }
             else {
                 cout << "You do not get money" << endl;

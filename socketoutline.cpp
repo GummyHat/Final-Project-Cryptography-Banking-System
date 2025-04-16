@@ -260,7 +260,7 @@ void * clientHandle(void * newSock) {
                 }
                 else if (request == 2) // WITHDRAW
                 {
-                    if (amountReq <= 0 && (curUser->money - amountReq >= 0)) {
+                    if (amountReq <= 0 || (curUser->money - amountReq < 0)) {
                         message[0] = (char) 0;
                     } else {
                         curUser->money -= amountReq;
