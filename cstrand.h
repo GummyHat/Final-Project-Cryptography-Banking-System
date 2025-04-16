@@ -7,7 +7,7 @@
 class cstrand
 {
 private:
-    long long random;
+    __uint128_t random;
     long long n;
     int posMod(int i, int n){
         return (i % n + n) % n;
@@ -75,9 +75,11 @@ public:
     }
 
     long long getNxt(){
+        random = random; //to prevent overflow
         random = (random*random) % n; //standard blum blum algorithm
         
-        return random;
+        return (long long)random;
     }
 };
+
 #endif
