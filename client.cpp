@@ -208,32 +208,36 @@ int main() {
                 delete hints;
                 exit(0);
             }
-            cout << "WOW YOU HAVE: $" << ammount << endl
+            cout << "WOW YOU HAVE: $" << ammount << endl;
         }
         else if (switchCase == 1) {
             cout << "Input deposit ammount" << endl;
             std::string sender;
             cin >> sender;
             buffer[0] = 1;
-            ((*int)(buffer + 1))[0] = atoi(sender.c_str);
-            ((*time_t)(buffer + 5))[0] = time(NULL);
+            ((int*)(buffer + 1))[0] = atoi(sender.c_str());
+            ((time_t*)(buffer + 5))[0] = time(NULL);
             sender.clear();
             for (int i = 0; i < 13; ++i) {
                 sender.push_back(buffer[i]);
             }
-            sender = createMac(sender, Key1);
+            sender = createMAC(sender, Key1);
             sender = Hex_To_Binary(sender);
             sender.copy(buffer + 13, 20);
-            TDES_Encrypyt_Bytes((unsigned char *)message, (unsigned char *)buffer, sizeof(buffer), TDES_Key);
+            TDES_Encrypt_Bytes((unsigned char *)message, (unsigned char *)buffer, sizeof(buffer), TDES_Key);
             send(sd, message, sizeof(message), 0);
             recv(sd, message, sizeof(message), 0);
             TDES_Decrypt_Bytes((unsigned char *)buffer, (unsigned char *)message, sizeof(buffer), TDES_Key);
+            std::string messageHex;
+            for (int i = 0; i < 5; ++i) {
+                messageHex += buffer[i];
+            }
             messageHex = createMAC(messageHex, Key1);
             messageHex = Hex_To_Binary(messageHex);
             int ammount = ((int *)buffer)[0];
             std::string other;
             for (int i = 0; i < 20; ++i) {
-                other += buffer[i + 4];
+                other += buffer[i + 5];
             }
             if (other.compare(messageHex) != 0) {
                 cout << "bad hmac" << endl;
@@ -255,25 +259,29 @@ int main() {
             std::string sender;
             cin >> sender;
             buffer[0] = 1;
-            ((*int)(buffer + 1))[0] = atoi(sender.c_str);
-            ((*time_t)(buffer + 5))[0] = time(NULL);
+            ((int*)(buffer + 1))[0] = atoi(sender.c_str());
+            ((time_t*)(buffer + 5))[0] = time(NULL);
             sender.clear();
             for (int i = 0; i < 13; ++i) {
                 sender.push_back(buffer[i]);
             }
-            sender = createMac(sender, Key1);
+            sender = createMAC(sender, Key1);
             sender = Hex_To_Binary(sender);
             sender.copy(buffer + 13, 20);
-            TDES_Encrypyt_Bytes((unsigned char *)message, (unsigned char *)buffer, sizeof(buffer), TDES_Key);
+            TDES_Encrypt_Bytes((unsigned char *)message, (unsigned char *)buffer, sizeof(buffer), TDES_Key);
             send(sd, message, sizeof(message), 0);
             recv(sd, message, sizeof(message), 0);
             TDES_Decrypt_Bytes((unsigned char *)buffer, (unsigned char *)message, sizeof(buffer), TDES_Key);
+            std::string messageHex;
+            for (int i = 0; i < 5; ++i) {
+                messageHex += buffer[i];
+            }
             messageHex = createMAC(messageHex, Key1);
             messageHex = Hex_To_Binary(messageHex);
             int ammount = ((int *)buffer)[0];
             std::string other;
             for (int i = 0; i < 20; ++i) {
-                other += buffer[i + 4];
+                other += buffer[i + 5];
             }
             if (other.compare(messageHex) != 0) {
                 cout << "bad hmac" << endl;

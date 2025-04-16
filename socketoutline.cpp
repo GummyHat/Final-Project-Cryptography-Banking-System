@@ -246,9 +246,8 @@ void * clientHandle(void * newSock) {
                     message[3] = (char)gen.getNxt();
                     message[4] = (char)gen.getNxt();
                     std::string messageHex = to_string(message[0]) + to_string(message[1]) + to_string(message[2]) + to_string(message[3]) + to_string(message[4]);
-                    std::string messageHex = to_string(message[0]);
                     std::string hmac = createMAC(messageHex, Key1);
-                    hmac = hex_to_binary(hmac);
+                    hmac = Hex_To_Binary(hmac);
                     hmac.copy(message+5, 20);
                     TDES_Encrypt_Bytes(cipherTextOut, (unsigned char *) message, sizeof(message), TDES_Key);
                 }
@@ -266,7 +265,7 @@ void * clientHandle(void * newSock) {
                     message[4] = (char)gen.getNxt();
                     std::string messageHex = to_string(message[0]) + to_string(message[1]) + to_string(message[2]) + to_string(message[3]) + to_string(message[4]);
                     std::string hmac = createMAC(messageHex, Key1);
-                    hmac = hex_to_binary(hmac);
+                    hmac = Hex_To_Binary(hmac);
                     hmac.copy(message+5, 20);
                     TDES_Encrypt_Bytes(cipherTextOut, (unsigned char *)message, sizeof(message), TDES_Key);
                 }
