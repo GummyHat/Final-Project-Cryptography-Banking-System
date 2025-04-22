@@ -96,7 +96,7 @@ int main() {
         }
         setRandomEncryptValues(mes, size);
         eccEncrypt(points, size, (CPoint *)buffer);
-        cout << "sent: " << send(sd, buffer, sizeof(buffer), 0) << endl;
+        send(sd, buffer, sizeof(buffer), 0);
         cout << "Input password" << endl;
         cin >> readLine;
         SHA1 checksum;

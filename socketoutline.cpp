@@ -131,7 +131,7 @@ int main(){
             // }
             cout << "macSize: " << hmac.size() << endl;
             if (hmac.compare(clientMac) != 0) {
-                cout << "MACCING" << endl;
+                cout << "bad hmac" << endl;
                 close(clientSocket);
                 goto accepting;
             }
@@ -169,7 +169,7 @@ int main(){
             // }
             cout << "macSize: " << hmac.size() << endl;
             if (hmac.compare(clientMac) != 0) {
-                cout << "MACCING" << endl;
+                cout << "bad hmac" << endl;
                 close(clientSocket);
                 goto accepting;
             }
@@ -181,7 +181,7 @@ int main(){
             for (int i = 0; i < database.size(); ++i) {
                 cout << database[i].name << ":" << database[i].hash << endl;
                 if (database[i].name == username && database[i].hash == password) {
-                    cout << "WE LOOGGED" << endl;
+                    cout << database[i].name << " has logged in" << endl;
                     curUser = &database[i];
                     logged = true;
                     break;
@@ -236,15 +236,13 @@ int main(){
                 for (int i = 0; i < 20; ++i) {
                     sentHash += decrypted[i + 13];
                 }
-                cout << "sub: " << curtime - timeSp << endl << "curtime: " << timeSp << endl;
                 if(sentHash.compare(hashedMac) != 0 || curtime-timeSp >= 120){
                     //they do not equal. issue
                     esc = true;
                     close(clientSocket);
-                    cout << "bad hmac" << endl;
+                    cout << "bad hmac or timestamp" << endl;
                     break;
                 }
-                cout << "WE MADE IT" << endl;
                 unsigned char cipherTextOut[256];
                 memset(message, 0, sizeof(message)); // CLEAR MESSAGE
                 if (request == 0) // CHECK BALANCE
@@ -282,7 +280,6 @@ int main(){
                         messageHex.push_back(message[i]);
                     }
                     std::string hmac = createMAC(messageHex, Key1);
-                    cout << "please god: " << hmac << endl;
                     hmac = Hex_To_Binary(hmac);
                     hmac.copy(message+5, 20);
                     TDES_Encrypt_Bytes(cipherTextOut, (unsigned char *) message, sizeof(message), TDES_Key);
