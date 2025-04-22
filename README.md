@@ -23,3 +23,6 @@ Compile socketoutline.cpp
 &ensp;Server itself, has little tolerance for clients should run without input
 
 
+export LD_LIBRARY_PATH=$(pwd) \
+g++ -o client/server.out client/socketoutline.cpp TDES.cpp -L. -lECC
+
